@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
+import { useCartStore } from "../store/useCartStore";
 import { ShoppingCartIcon, LogOutIcon, UserIcon, LogInIcon, UserPlusIcon } from "lucide-react";
 import ThemeSelector from "./ThemeSelector";
 
 function Navbar() {
   const { isAuthenticated, user, logout, isAdmin } = useAuthStore();
+  const { getCartCount } = useCartStore();
 
   const handleLogout = () => {
     logout();
@@ -45,7 +47,6 @@ function Navbar() {
       </div>
 
       <div className="navbar-end gap-2">
-        {/* Theme Selector - Always Visible */}
         <ThemeSelector />
 
         {isAuthenticated ? (
@@ -54,7 +55,11 @@ function Navbar() {
               <Link to="/cart" className="btn btn-ghost btn-circle">
                 <div className="indicator">
                   <ShoppingCartIcon className="h-5 w-5" />
-                  <span className="badge badge-sm indicator-item badge-primary">0</span>
+                  {getCartCount() > 0 && (
+                    <span className="badge badge-sm indicator-item badge-primary">
+                      {getCartCount()}
+                    </span>
+                  )}
                 </div>
               </Link>
             )}

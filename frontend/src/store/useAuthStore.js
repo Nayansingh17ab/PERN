@@ -4,6 +4,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "";
+const INACTIVITY_TIMEOUT = 2 * 24 * 60 * 60 * 1000; // 2 days in milliseconds
 
 export const useAuthStore = create(
   persist(
@@ -11,6 +12,26 @@ export const useAuthStore = create(
       user: null,
       isAuthenticated: false,
       loading: false,
+      lastActivity: Date.now(), // ✅ Track last activity time
+
+      // Update last activity
+      updateActivity: () => {
+        set({ lastActivity: Date.now() });
+      },
+
+      // Check if session is expired
+      checkSessionExpiry: () => {
+        const state = get();
+        const timeSinceLastActivity = Date.now() - state.lastActivity;
+        
+        if (timeSinceLastActivity > INACTIVITY_TIMEOUT) {
+          console.log("Session expired due to inactivity");
+          get().logout();
+          toast.error("Your session has expired due to inactivity. Please login again.");
+          return true;
+        }
+        return false;
+      },
 
       register: async (userData) => {
         set({ loading: true });
@@ -18,7 +39,12 @@ export const useAuthStore = create(
           const response = await axios.post(`${BASE_URL}/api/auth/register`, userData, {
             withCredentials: true
           });
-          set({ user: response.data.user, isAuthenticated: true, loading: false });
+          set({ 
+            user: response.data.user, 
+            isAuthenticated: true, 
+            loading: false,
+            lastActivity: Date.now() // ✅ Set initial activity time
+          });
           toast.success("Registration successful!");
           return response.data;
         } catch (error) {
@@ -34,7 +60,12 @@ export const useAuthStore = create(
           const response = await axios.post(`${BASE_URL}/api/auth/login`, credentials, {
             withCredentials: true
           });
-          set({ user: response.data.user, isAuthenticated: true, loading: false });
+          set({ 
+            user: response.data.user, 
+            isAuthenticated: true, 
+            loading: false,
+            lastActivity: Date.now() // ✅ Set initial activity time
+          });
           toast.success("Login successful!");
           return response.data;
         } catch (error) {
@@ -46,31 +77,41 @@ export const useAuthStore = create(
 
       logout: async () => {
         try {
-          await axios.post(`${BASE_URL}/api/auth/logout`, {}, { withCredentials: true });
-          set({ user: null, isAuthenticated: false });
-          toast.success("Logout successful!");
+          await axios.post(`${BASE_URL}/api/auth/logout`, {}, {
+            withCredentials: true
+          });
+          set({ user: null, isAuthenticated: false, lastActivity: null });
+          toast.success("Logged out successfully!");
         } catch (error) {
-          toast.error("Logout failed");
+          console.error("Logout error:", error);
+          // Force logout even if API fails
+          set({ user: null, isAuthenticated: false, lastActivity: null });
         }
       },
 
       checkAuth: async () => {
+        // Check session expiry first
+        if (get().checkSessionExpiry()) {
+          return;
+        }
+
         try {
           const response = await axios.get(`${BASE_URL}/api/auth/me`, {
             withCredentials: true
           });
-          set({ user: response.data, isAuthenticated: true });
+          set({ 
+            user: response.data.user, 
+            isAuthenticated: true,
+            lastActivity: Date.now() // ✅ Update activity
+          });
         } catch (error) {
-          set({ user: null, isAuthenticated: false });
+          set({ user: null, isAuthenticated: false, lastActivity: null });
         }
       },
 
       isAdmin: () => {
-        return get().user?.role === 'admin';
-      },
-
-      isCustomer: () => {
-        return get().user?.role === 'customer';
+        const state = get();
+        return state.user?.role === "admin";
       },
     }),
     {

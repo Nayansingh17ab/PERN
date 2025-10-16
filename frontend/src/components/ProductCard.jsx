@@ -1,10 +1,12 @@
 import { EditIcon, Trash2Icon, ShoppingCartIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
+import { useCartStore } from "../store/useCartStore";
 import toast from "react-hot-toast";
 
 function ProductCard({ product, subcategory, department, onDelete }) {
   const { isAuthenticated, isAdmin } = useAuthStore();
+  const { addToCart } = useCartStore();
   const navigate = useNavigate();
 
   const handleDelete = async () => {
@@ -19,9 +21,8 @@ function ProductCard({ product, subcategory, department, onDelete }) {
       navigate("/login", { state: { from: `/${department}/${subcategory}` } });
       return;
     }
-    // Add to cart or navigate to checkout
-    toast.success("Product added to cart!");
-    // You can implement cart functionality here
+    // Add to cart
+    addToCart(product, department, subcategory);
   };
 
   const handleEdit = () => {
@@ -138,7 +139,7 @@ function ProductCard({ product, subcategory, department, onDelete }) {
               disabled={product.stock_quantity === 0}
             >
               <ShoppingCartIcon className="w-4 h-4 mr-1" />
-              Buy Now
+              Add to Cart
             </button>
           )}
 

@@ -9,6 +9,7 @@ import sequelize from "./db.config/db.js";
 
 // ========== AUTH ROUTES ==========
 import authRoutes from "./routes/authRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 
 // ========== CLOTHING ROUTES ==========
 import shirtsRoutes from "./routes/clothingRoutes/shirtsRoutes.js";
@@ -50,18 +51,19 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware setup
-app.use(express.json());
-app.use(helmet());
-app.use(cors({
+// ✅ MIDDLEWARE SETUP - CORRECT ORDER IS CRITICAL!
+app.use(express.json());           // 1. Parse JSON bodies
+app.use(cookieParser());            // 2. Parse cookies BEFORE routes
+app.use(cors({                      // 3. CORS configuration
   origin: 'http://localhost:5173',
   credentials: true
 }));
-app.use(morgan("dev"));
-app.use(cookieParser());
+app.use(helmet());                  // 4. Security headers
+app.use(morgan("dev"));             // 5. Request logging
 
 // ========== AUTH ROUTES ==========
 app.use("/api/auth", authRoutes);
+app.use("/api/orders", orderRoutes);
 
 // ========== CLOTHING ROUTES ==========
 app.use("/api/clothing/shirts", shirtsRoutes);
@@ -129,28 +131,39 @@ async function initDB() {
     `);
 
     await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        total_amount DECIMAL(10, 2) NOT NULL,
-        status VARCHAR(50) DEFAULT 'pending',
-        shipping_address TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+  CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    total_amount DECIMAL(10, 2) NOT NULL,
+    tax_amount DECIMAL(10, 2) NOT NULL,
+    shipping_address TEXT NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    pincode VARCHAR(10) NOT NULL,
+    phone VARCHAR(15) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    payment_status VARCHAR(50) DEFAULT 'pending',
+    order_status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`);
 
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS order_items (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
-        product_type VARCHAR(100) NOT NULL,
-        product_id INTEGER NOT NULL,
-        subcategory VARCHAR(100) NOT NULL,
-        quantity INTEGER NOT NULL,
-        price DECIMAL(10, 2) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+await sequelize.query(`
+  CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    department VARCHAR(50) NOT NULL,
+    subcategory VARCHAR(50) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    quantity INTEGER NOT NULL,
+    image VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
     // ========== CLOTHING TABLES (Already created) ==========
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS shirts (
@@ -660,6 +673,7 @@ async function initDB() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
 
     console.log("All department tables created successfully!");
   } catch (error) {

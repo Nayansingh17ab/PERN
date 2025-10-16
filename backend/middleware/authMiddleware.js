@@ -1,37 +1,44 @@
-import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_super_secret_jwt_key_change_in_production";
 
-// Verify JWT Token
+// ========================================
+// Authentication Middleware
+// ========================================
 export const verifyToken = (req, res, next) => {
   try {
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    const token = req.cookies.token;
 
     if (!token) {
-      return res.status(401).json({ error: "Unauthorized - No token provided" });
+      return res.status(401).json({ error: "No token provided. Authentication required." });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // { id, role }
+    req.user = decoded; // Contains { id, role }
     next();
   } catch (error) {
-    console.error("Error in verifyToken:", error);
-    return res.status(401).json({ error: "Unauthorized - Invalid token" });
+    console.error("Token verification error:", error);
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 };
 
-// Check if user is Admin
-export const isAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: "Forbidden - Admin access required" });
+// Export as authenticateToken as well (alias for compatibility)
+export const authenticateToken = verifyToken;
+
+// ========================================
+// Admin Authorization Middleware
+// ========================================
+export const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
   }
+
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
   next();
 };
 
-// Check if user is Customer
-export const isCustomer = (req, res, next) => {
-  if (req.user.role !== 'customer') {
-    return res.status(403).json({ error: "Forbidden - Customer access required" });
-  }
-  next();
-};
+// Export as isAdmin as well (alias for compatibility)
+export const isAdmin = requireAdmin;
